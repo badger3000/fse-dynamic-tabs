@@ -160,7 +160,7 @@ function get_products_content() {
             
             <!-- wp:image {"align":"center","sizeSlug":"large","linkDestination":"none"} -->
             <figure class="wp-block-image aligncenter size-large">
-                <img src="' . plugin_dir_url(__FILE__) . 'assets/images/placeholder-product.jpg" alt="Product" />
+                <img src="' . plugin_dir_url(__FILE__) . 'assets/images/placeholder-product.jpg" width="310px" height="auto" alt="Product" />
             </figure>
             <!-- /wp:image -->
             
@@ -249,7 +249,7 @@ function get_about_content() {
     <!-- wp:media-text {"mediaPosition":"left","mediaWidth":40,"align":"wide"} -->
     <div class="wp-block-media-text alignwide" style="grid-template-columns:40% auto">
         <figure class="wp-block-media-text__media">
-            <img src="' . plugin_dir_url(__FILE__) . 'assets/images/team-placeholder.jpg" alt="Our Team" />
+             <img src="' . plugin_dir_url(__FILE__) . 'assets/images/placeholder-product.jpg" width="645px" height="auto" alt="Our Team" />
         </figure>
         <div class="wp-block-media-text__content">
             <!-- wp:heading -->
