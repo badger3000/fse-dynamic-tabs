@@ -270,14 +270,51 @@ add_action('admin_menu', 'fse_dynamic_tabs_add_settings_page');
 function fse_dynamic_tabs_get_patterns() {
     $patterns = array();
     
-    if (function_exists('WP_Block_Patterns_Registry::get_instance')) {
+    // Method 1: Get patterns from WP_Block_Patterns_Registry
+    if (class_exists('WP_Block_Patterns_Registry')) {
         $registry = WP_Block_Patterns_Registry::get_instance();
         $registered_patterns = $registry->get_all_registered();
         
-        foreach ($registered_patterns as $pattern) {
-            $patterns[$pattern['name']] = $pattern['title'];
+        if (!empty($registered_patterns) && is_array($registered_patterns)) {
+            foreach ($registered_patterns as $pattern) {
+                if (isset($pattern['name']) && isset($pattern['title'])) {
+                    $patterns[$pattern['name']] = $pattern['title'];
+                }
+            }
         }
     }
+    
+    // Method 2: Use get_block_patterns() function (available in WP 5.8+)
+    if (function_exists('get_block_patterns')) {
+        $wp_patterns = get_block_patterns();
+        
+        if (!empty($wp_patterns) && is_array($wp_patterns)) {
+            foreach ($wp_patterns as $pattern) {
+                if (isset($pattern['name']) && isset($pattern['title'])) {
+                    $patterns[$pattern['name']] = $pattern['title'];
+                }
+            }
+        }
+    }
+    
+    // Method 3: Get user-created patterns from the database
+    // User patterns are stored as 'wp_block' post type
+    $user_patterns = get_posts(array(
+        'post_type'      => 'wp_block',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+    ));
+    
+    if (!empty($user_patterns) && !is_wp_error($user_patterns)) {
+        foreach ($user_patterns as $pattern) {
+            // Add prefix to distinguish from core patterns
+            $pattern_key = 'user-pattern/' . $pattern->post_name;
+            $patterns[$pattern_key] = $pattern->post_title . ' (User Pattern)';
+        }
+    }
+    
+    // Debug: Log the detected patterns
+    error_log('Detected patterns: ' . print_r($patterns, true));
     
     return $patterns;
 }
@@ -291,22 +328,21 @@ function fse_dynamic_tabs_settings_page() {
         'tabs' => array(
             'products' => array(
                 'content_type' => 'default',
-                'pattern_name' => '',
+                'pattern_name' => '',  
                 'content_id' => 0
             ),
             'services' => array(
                 'content_type' => 'default',
-                'pattern_name' => '',
+                'pattern_name' => '',  
                 'content_id' => 0
             ),
             'about' => array(
                 'content_type' => 'default',
-                'pattern_name' => '',
+                'pattern_name' => '',  
                 'content_id' => 0
             )
         )
     ));
-    
     // Get available patterns
     $patterns = fse_dynamic_tabs_get_patterns();
     
@@ -341,7 +377,7 @@ function fse_dynamic_tabs_settings_page() {
                             <select name="fse_dynamic_tabs_options[tabs][products][pattern_name]">
                                 <option value=""><?php _e('-- Select a Pattern --', 'fse-dynamic-tabs'); ?></option>
                                 <?php foreach ($patterns as $pattern_name => $pattern_title) : ?>
-                                    <option value="<?php echo esc_attr($pattern_name); ?>" <?php selected($options['tabs']['products']['pattern_name'], $pattern_name); ?>>
+                                    <option value="<?php echo esc_attr($pattern_name); ?>" <?php selected(isset($options['tabs']['products']['pattern_name']) ? $options['tabs']['products']['pattern_name'] : '', $pattern_name); ?>>
                                         <?php echo esc_html($pattern_title); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -561,12 +597,30 @@ function fse_ajax_get_tab_content() {
     switch ($tab_settings['content_type']) {
         case 'pattern':
             if (!empty($tab_settings['pattern_name'])) {
-                // Get pattern content from the registry
-                if (function_exists('WP_Block_Patterns_Registry::get_instance')) {
-                    $registry = WP_Block_Patterns_Registry::get_instance();
-                    if ($registry->is_registered($tab_settings['pattern_name'])) {
-                        $pattern = $registry->get_registered($tab_settings['pattern_name']);
-                        $content = $pattern['content'];
+                // Check if it's a user pattern (has the 'user-pattern/' prefix)
+                if (strpos($tab_settings['pattern_name'], 'user-pattern/') === 0) {
+                    // Extract the post name from the pattern name
+                    $post_name = str_replace('user-pattern/', '', $tab_settings['pattern_name']);
+                    
+                    // Get the pattern by post name
+                    $pattern_post = get_page_by_path($post_name, OBJECT, 'wp_block');
+                    
+                    if ($pattern_post) {
+                        $content = apply_filters('the_content', $pattern_post->post_content);
+                    }
+                } else {
+                    // It's a core or theme pattern
+                    if (function_exists('WP_Block_Patterns_Registry::get_instance')) {
+                        $registry = WP_Block_Patterns_Registry::get_instance();
+                        if ($registry->is_registered($tab_settings['pattern_name'])) {
+                            $pattern = $registry->get_registered($tab_settings['pattern_name']);
+                            $content = $pattern['content'];
+                        }
+                    } else if (function_exists('get_block_pattern')) {
+                        $pattern = get_block_pattern($tab_settings['pattern_name']);
+                        if ($pattern && isset($pattern['content'])) {
+                            $content = $pattern['content'];
+                        }
                     }
                 }
             }
